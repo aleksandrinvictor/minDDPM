@@ -1,0 +1,66 @@
+# Denoising Diffusion Probabilistic Model
+This repo contains simple reimplementation of Denoising Diffusion Probabilistic Model paper: [Ho et al](https://arxiv.org/abs/2006.11239)
+
+## Data
+Following [[1]](#1) we used Fashion MNIST dataset.
+
+<img src="./assets/fashion_mnist-3.0.1.png" width="256"/>
+
+## Setup
+#### Pip
+`pip install -r requirements.txt`
+#### Docker
+1. `docker build -t ddpm .`
+2. `docker run -it ddpm`
+
+## Training
+`python src/train.py`
+
+There is a couple of settings you may want to specify:
+- `--batch_size` - set depending on your gpu memory available
+- `--num_epochs` - num epoch to train the model
+- `--diffusion_timesteps` - how many diffusion steps to make
+
+## Inference
+```python
+from src.diffusion import GaussianDiffusion, linear_beta_schedule
+from src.unet import Unet
+import torch
+
+from functools import partial
+import matplotlib.pyplot as plt
+
+unet = Unet(channels=1, dim_mults=(1, 2, 4), dim=28)
+checkpoint = torch.load("<checkpoint-path>")
+unet.load_state_dict(checkpoint["model_state_dict"])
+unet.to("cuda:1")
+
+timesteps = 300
+diffusion = GaussianDiffusion(noise_schedule=partial(linear_beta_schedule), timesteps=timesteps)
+
+result = diffusion.sample(model=unet, image_size=28, batch_size=64, channels=1)
+
+image_index = 8
+plt.imshow(res[-1][image_index].reshape(28, 28, 1), cmap="gray")
+```
+
+## Results
+
+<p><em>Fashion MNIST dataset samples</em></p>
+<p>
+    <img src="./assets/gt_images.png" width="256">
+</p>
+<p><em>Generated samples</em></p>
+<p>
+<img src="./assets/generated_images.png" width="256"/>
+</p>
+
+## References
+<a id="1">[1]</a>
+[The Annotated Diffusion Model.](https://huggingface.co/blog/annotated-diffusion)
+
+<a id="2">[2]</a>
+[Denoising Diffusion Probabilistic Model, in Pytorch.](https://github.com/lucidrains/denoising-diffusion-pytorch/tree/main)
+
+<a id="3">[3]</a>
+[Denoising Diffusion Probabilistic Models (DDPM).](https://nn.labml.ai/diffusion/ddpm/index.html)
