@@ -22,12 +22,14 @@ There is a couple of settings you may want to specify:
 - `--diffusion_timesteps` - how many diffusion steps to make
 
 ## Inference
+Load checkpoint (check Releases).
+
+Run the following code:
 ```python
 from src.diffusion import GaussianDiffusion, linear_beta_schedule
 from src.unet import Unet
 import torch
 
-from functools import partial
 import matplotlib.pyplot as plt
 
 unet = Unet(channels=1, dim_mults=(1, 2, 4), dim=28)
@@ -36,7 +38,7 @@ unet.load_state_dict(checkpoint["model_state_dict"])
 unet.to("cuda:1")
 
 timesteps = 300
-diffusion = GaussianDiffusion(noise_schedule=partial(linear_beta_schedule), timesteps=timesteps)
+diffusion = GaussianDiffusion(noise_schedule=linear_beta_schedule, timesteps=timesteps)
 
 result = diffusion.sample(model=unet, image_size=28, batch_size=64, channels=1)
 
