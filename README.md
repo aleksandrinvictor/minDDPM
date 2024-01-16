@@ -43,7 +43,8 @@ diffusion = GaussianDiffusion(noise_schedule=linear_beta_schedule, timesteps=tim
 result = diffusion.sample(model=unet, image_size=28, batch_size=64, channels=1)
 
 image_index = 8
-plt.imshow(res[-1][image_index].reshape(28, 28, 1), cmap="gray")
+image = (res[-1][image_index] + 1) * 0.5
+plt.imshow(image.reshape(28, 28, 1), cmap="gray")
 ```
 
 ## Results
