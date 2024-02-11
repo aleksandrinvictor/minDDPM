@@ -1,11 +1,19 @@
 """Diffusion process utils."""
 
+import enum
 from typing import Callable, Optional, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
+
+
+class SamplingMethod(enum.Enum):
+    """Sampling methods."""
+
+    DDPM = 0
+    DDIM = 1
 
 
 def linear_beta_schedule(timesteps: int) -> torch.Tensor:
@@ -120,12 +128,44 @@ class GaussianDiffusion:
             return model_mean + torch.sqrt(posterior_variance_t) * noise
 
     @torch.no_grad()
-    def p_sample_loop(self, model: nn.Module, shape: Tuple[int, int, int, int]) -> torch.Tensor:
+    def p_sample_ddim(self, model: nn.Module, x: torch.Tensor, t: torch.Tensor, t_index: int) -> torch.Tensor:
+        """Reverse diffusion process sample for DDIM model.
+
+        Args:
+            model: Model to generate eps_theta(x_t, t).
+            x: x_t: [b, c, h, w].
+            t: Timestep.
+            t_index: Timestep index.
+
+        Returns:
+            x_t-1: [b, c, h, w].
+        """
+        eps_theta = model(x, t)
+        sqrt_one_minus_alphas_cumprod_t = extract(self.sqrt_one_minus_alphas_cumprod, t, x.shape)
+        sqrt_alphas_cumprod_t = extract(self.sqrt_alphas_cumprod, t, x.shape)
+        sqrt_alphas_cumprod_t_m_1 = torch.sqrt(extract(self.alphas_cumprod_prev, t, x.shape))
+        sqrt_one_minus_alphas_cumprod_t_m_1 = torch.sqrt(1 - extract(self.alphas_cumprod_prev, t, x.shape))
+
+        # Check formula 10, 12 in DDIM paper
+        predicted_x0 = (x - sqrt_one_minus_alphas_cumprod_t * eps_theta) / sqrt_alphas_cumprod_t
+
+        if t_index == 0:
+            return predicted_x0
+        else:
+            direction_to_x_t = sqrt_one_minus_alphas_cumprod_t_m_1 * eps_theta
+
+            return sqrt_alphas_cumprod_t_m_1 * predicted_x0 + direction_to_x_t
+
+    @torch.no_grad()
+    def p_sample_loop(
+        self, model: nn.Module, shape: Tuple[int, int, int, int], sampling_method: SamplingMethod
+    ) -> torch.Tensor:
         """Reverse diffusion process sample from x_t to x_0.
 
         Args:
             model: Model to generate eps_theta(x_t, t).
             shape: Output shape.
+            sampling_method: DDPM or DDIM sampling method.
 
         Returns:
             x_0 sample.
@@ -143,7 +183,12 @@ class GaussianDiffusion:
             desc="sampling loop time step",
             total=self.timesteps,
         ):
-            img = self.p_sample(model, img, torch.full((b,), i, device=device, dtype=torch.long), i)
+            if sampling_method == SamplingMethod.DDPM:
+                img = self.p_sample(model, img, torch.full((b,), i, device=device, dtype=torch.long), i)
+            elif sampling_method == SamplingMethod.DDIM:
+                img = self.p_sample_ddim(model, img, torch.full((b,), i, device=device, dtype=torch.long), i)
+            else:
+                raise ValueError("Unknown sampling method")
             imgs.append(img.cpu())
 
         return imgs
@@ -154,6 +199,7 @@ class GaussianDiffusion:
         image_size: int,
         batch_size: int = 16,
         channels: int = 3,
+        sampling_method: SamplingMethod = SamplingMethod.DDPM,
     ):
         """Reverse diffusion process sample from x_t to x_0.
 
@@ -162,8 +208,11 @@ class GaussianDiffusion:
             image_size: Output image size.
             batch_size: How many images to generate. Defaults to 16.
             channels: Image num channels. Defaults to 3.
+            sampling_method: DDPM or DDIM sampling method.
 
         Returns:
             x_0 samples [b, c, h, w].
         """
-        return self.p_sample_loop(model, shape=(batch_size, channels, image_size, image_size))
+        return self.p_sample_loop(
+            model, shape=(batch_size, channels, image_size, image_size), sampling_method=sampling_method
+        )
