@@ -47,6 +47,19 @@ image = (res[-1][image_index] + 1) * 0.5
 plt.imshow(image.reshape(28, 28, 1), cmap="gray")
 ```
 
+You can also use DDIM sampling [[4]](#4). To do that, modify the example in the following way:
+```python
+from src.diffusion import SamplingMethod
+
+result = diffusion.sample(
+    model=unet,
+    image_size=28,
+    batch_size=64,
+    channels=1,
+    sampling_method=SamplingMethod.DDIM
+)
+```
+
 ## Results
 
 <p><em>Fashion MNIST dataset samples</em></p>
@@ -67,3 +80,6 @@ plt.imshow(image.reshape(28, 28, 1), cmap="gray")
 
 <a id="3">[3]</a>
 [Denoising Diffusion Probabilistic Models (DDPM).](https://nn.labml.ai/diffusion/ddpm/index.html)
+
+<a id="4">[4]</a>
+[Denoising Diffusion Implicit Models (DDIM).](https://arxiv.org/abs/2010.02502)
